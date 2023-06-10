@@ -1,0 +1,20 @@
+{
+  "name": "i18n-check-keys",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "scripts": {
+    "test": "node ./test/index.js"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.22.4",
+    "@babel/traverse": "^7.22.4",
+    "@babel/types": "^7.22.4",
+    "@types/babel__traverse": "^7.20.1",
+    "@types/webpack": "^4.41.26",
+    "chalk": "^4.1.2"
+  },
+  "license": "ISC"
+}
