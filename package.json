@@ -1,9 +1,20 @@
 {
   "name": "i18n-check-keys",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.1.0",
+  "description": "A tool to check for missing internationalization keys in a project",
   "main": "index.js",
-  "keywords": [],
+  "files": [
+    "index.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heimeiyaodagongzai/i18n-check-keys"
+  },
+  "keywords": [
+    "i18n",
+    "check keys",
+    "国际化检查"
+  ],
   "author": "",
   "scripts": {
     "test": "node ./test/index.js"

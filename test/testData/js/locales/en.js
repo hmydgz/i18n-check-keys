@@ -1,4 +1,4 @@
-import test from '../../json/locale/en.json'
+import test from '../../jsDir/locales/en/test1'
 
 export default {
   a1: {
