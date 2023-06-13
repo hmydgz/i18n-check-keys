@@ -1,20 +1,26 @@
-const fs = require('fs')
-const path = require('path')
-// const generator = require('@babel/generator')
-const parser = require('@babel/parser')
-const traverse = require('@babel/traverse')
-const types = require('@babel/types')
-const chalk = require('chalk')
+import require$$0 from 'fs';
+import require$$1 from 'path';
+import require$$2 from '@babel/parser';
+import require$$3 from '@babel/traverse';
+import '@babel/types';
+import require$$5 from 'chalk';
 
-const fileImportVariableMap = {} // 记录导入的变量
-const objMap = {} // 记录对象
-let currentImportVariablePathMap = {} // 当前导入的变量路径
-let currentBenchmarkPath = '' // 当前基准文件路径
+var src = {};
+
+const fs = require$$0;
+const path = require$$1;
+// const generator = require('@babel/generator')
+const parser = require$$2;
+const traverse = require$$3;
+const chalk = require$$5;
+
+const fileImportVariableMap = {}; // 记录导入的变量
+const objMap = {}; // 记录对象
 
 function completionSuffix(filePath, fileType = 'js') { // 后缀补全
   // 判断是否有后缀
   if (/\.\w+$/.test(filePath)) return filePath
-  if (!filePath.endsWith(`.${fileType}`)) filePath += `.${fileType}`
+  if (!filePath.endsWith(`.${fileType}`)) filePath += `.${fileType}`;
   return filePath
 }
 
@@ -28,12 +34,12 @@ function getImportFilePath(basePath, filePath) {
 }
 
 function getImportVariableFileAst(importFilePath) {
-  let res
+  let res;
   switch (importFilePath.match(/\.(\w+)$/)[1]) {
     case 'json': res = loadJsonAst(importFilePath); break
     default: res = loadJsAst(importFilePath); break
   }
-  objMap[importFilePath] = astToObj(getAstBody(res))
+  objMap[importFilePath] = astToObj(getAstBody(res));
   return res
 }
 
@@ -41,13 +47,13 @@ function getImportVariableFileAst(importFilePath) {
  * 通过 AST Path 获取变量的路径
  */
 function getVariableAstPath(_astPath) {
-  const _path = []
+  const _path = [];
   const fn = (__astPath) => {
     if (__astPath.parentPath.node.type === 'Program') return
-    if (__astPath.node.type === 'ObjectProperty') _path.unshift(__astPath.node.key.name)
-    fn(__astPath.parentPath)
-  }
-  fn(_astPath)
+    if (__astPath.node.type === 'ObjectProperty') _path.unshift(__astPath.node.key.name);
+    fn(__astPath.parentPath);
+  };
+  fn(_astPath);
   return _path
 }
 
@@ -56,50 +62,50 @@ function getVariableAstPath(_astPath) {
  */
 function loadJsAst(filePath = '') {
   try {
-    let code = fs.readFileSync(filePath).toString()
-    const ast = parser.parse(code, { sourceType: 'unambiguous' })
-    const sourceType = ast.program.sourceType
+    let code = fs.readFileSync(filePath).toString();
+    const ast = parser.parse(code, { sourceType: 'unambiguous' });
+    const sourceType = ast.program.sourceType;
 
-    const importVariableMap = {} // 记录导入的变量
-    const body = ast.program.body
-    const fileType = filePath.match(/\.(\w+)$/)[1]
+    const importVariableMap = {}; // 记录导入的变量
+    const body = ast.program.body;
+    const fileType = filePath.match(/\.(\w+)$/)[1];
 
     if (sourceType === 'module') { // ESM
       body.filter(v => v.type === 'ImportDeclaration').forEach(v => {
-        importVariableMap[v.specifiers[0].local.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) }
-      })
+        importVariableMap[v.specifiers[0].local.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) };
+      });
     } else if (sourceType === 'script') { // CommonJS
       body.filter(v => {
         return v.type === 'VariableDeclaration' &&
           v.declarations[0].init.type === 'CallExpression' &&
           v.declarations[0].init.callee.name === 'require'
       }).forEach(v => {
-        importVariableMap[v.declarations[0].id.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) }
-      })
+        importVariableMap[v.declarations[0].id.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) };
+      });
     }
 
-    fileImportVariableMap[filePath] = importVariableMap
+    fileImportVariableMap[filePath] = importVariableMap;
 
     traverse.default(ast, {
       SpreadElement(_path) { // 处理展开运算符
         if (importVariableMap[_path.node.argument.name]) {
-          importVariableMap[_path.node.argument.name].variablePath = getVariableAstPath(_path)
-          _path.replaceInline(getAstBody(getImportVariableFileAst(importVariableMap[_path.node.argument.name].path)).properties)
+          importVariableMap[_path.node.argument.name].variablePath = getVariableAstPath(_path);
+          _path.replaceInline(getAstBody(getImportVariableFileAst(importVariableMap[_path.node.argument.name].path)).properties);
         }
       },
       ObjectProperty(_path) { // 处理变量类型的值
         if (_path.node.value.type === 'Identifier' && importVariableMap[_path.node.value.name]) {
-          importVariableMap[_path.node.value.name].variablePath = getVariableAstPath(_path)
-          _path.node.value = getAstBody(getImportVariableFileAst(importVariableMap[_path.node.value.name].path))
+          importVariableMap[_path.node.value.name].variablePath = getVariableAstPath(_path);
+          _path.node.value = getAstBody(getImportVariableFileAst(importVariableMap[_path.node.value.name].path));
         }
       }
-    })
+    });
 
     return ast
   } catch (error) {
-    console.log('')
-    console.log(chalk.bgRed(`I18nCheckKeys loadJsAst error: `), chalk.red(`${filePath}`))
-    console.log('')
+    console.log('');
+    console.log(chalk.bgRed(`I18nCheckKeys loadJsAst error: `), chalk.red(`${filePath}`));
+    console.log('');
     throw error
   }
 }
@@ -108,7 +114,7 @@ function loadJsAst(filePath = '') {
  * 加载 JSON 文件的 AST
  */
 function loadJsonAst(filePath = '') {
-  const code = fs.readFileSync(filePath).toString()
+  const code = fs.readFileSync(filePath).toString();
   return parser.parse(`export default ${code}`, { sourceType: 'unambiguous' })
 }
 
@@ -117,14 +123,14 @@ function loadJsonAst(filePath = '') {
  */
 function astToObj(ast) {
   if (ast.type === 'ObjectExpression') {
-    const obj = {}
+    const obj = {};
     ast.properties.forEach(v => {
       if (v.type === 'ObjectProperty') {
         obj[v.key.name || v.key.value] = v.value.type === 'ObjectExpression'
           ? astToObj(v.value)
-          : v.value.value
+          : v.value.value;
       }
-    })
+    });
     return obj
   }
 }
@@ -145,7 +151,7 @@ function getAstBody(ast) {
  * 获取对齐空格
  */
 function getAlignmentSpaceStr(str, len = 60) {
-  const _len = Math.max(60, len) - str.length
+  const _len = Math.max(60, len) - str.length;
   return str + ' '.repeat(_len < 0 ? 5 : _len)
 }
 
@@ -156,23 +162,23 @@ function getAlignmentSpaceStr(str, len = 60) {
  */
 function getObjByPath(_path) {
   try {
-    const fileType = _path.match(/\.(\w+)$/)[1].toLowerCase()
-    let res
+    const fileType = _path.match(/\.(\w+)$/)[1].toLowerCase();
+    let res;
     switch (fileType) {
       case 'js': case 'ts':
-        res = astToObj(getAstBody(loadJsAst(_path)))
+        res = astToObj(getAstBody(loadJsAst(_path)));
         break
       case 'json':
-        res = JSON.parse(fs.readFileSync(_path).toString() ?? '{}')
+        res = JSON.parse(fs.readFileSync(_path).toString() ?? '{}');
         break
     }
-    objMap[_path] = res
+    objMap[_path] = res;
     // console.log(res)
     return res
   } catch (error) {
-    console.log('')
-    console.log(chalk.bgRed(`I18nCheckKeys getObjByPath error: `), chalk.red(`${_path}`))
-    console.log('')
+    console.log('');
+    console.log(chalk.bgRed(`I18nCheckKeys getObjByPath error: `), chalk.red(`${_path}`));
+    console.log('');
     throw error
   }
 }
@@ -183,22 +189,22 @@ function getObjByPath(_path) {
  * @param {*} _localePat 
  */
 function getLocalePath(_currentDirPath = process.cwd(), _localePath = /locale/) {
-  const localePathList = []
+  const localePathList = [];
   const _getLocalePath = (_path) => {
     fs.readdirSync(_path, { withFileTypes: true }).forEach((dirent) => {
-      const filePath = path.join(_path, dirent.name)
+      const filePath = path.join(_path, dirent.name);
       if (/node_modules|git/g.test(filePath)) return
       if (dirent.isDirectory()) {
         if (_localePath.test(filePath)) {
-          localePathList.push(filePath)
+          localePathList.push(filePath);
         } else {
-          _getLocalePath(filePath)
+          _getLocalePath(filePath);
         }
       }
-    })
-  }
+    });
+  };
 
-  _getLocalePath(_currentDirPath)
+  _getLocalePath(_currentDirPath);
 
   return localePathList
 }
@@ -222,42 +228,42 @@ function getFileTypeRegExp(fileType) {
  * 读取基准内容
  */
 function getBenchmark({ fileType, languages, benchmarkLang, localePathList }) {
-  const _fileType = getFileTypeRegExp(fileType)
-  const localeFileMap = {}
+  const _fileType = getFileTypeRegExp(fileType);
+  const localeFileMap = {};
   localePathList.forEach(v => {
-    localeFileMap[v] = { benchmark: undefined, other: [], sameNameDirPath: [] }
+    localeFileMap[v] = { benchmark: undefined, other: [], sameNameDirPath: [] };
     try {
       fs.readdirSync(v, { withFileTypes: true }).forEach((dirent) => {
         // 匹配文件后缀
         if (dirent.isDirectory()) return
         if (!_fileType.test(dirent.name) && dirent.name) return
-        const filePath = path.join(v, dirent.name)
+        const filePath = path.join(v, dirent.name);
 
         if (dirent.name.includes(benchmarkLang)) {
-          localeFileMap[v].benchmark = getObjByPath(filePath)
-          localeFileMap[v].benchmarkPath = filePath
+          localeFileMap[v].benchmark = getObjByPath(filePath);
+          localeFileMap[v].benchmarkPath = filePath;
         } else {
           // 匹配要检查的语言
           if (languages.length && !languages.some(v => dirent.name.includes(v))) return
-          localeFileMap[v].other.push(filePath)
+          localeFileMap[v].other.push(filePath);
         }
 
         // const sameNameDirPath = path.join(v, dirent.name.split('.')[0])
         // fs.existsSync(sameNameDirPath) && localeFileMap[v].sameNameDirPath.push(dirent.name.split('.')[0])
-      })
+      });
       // console.log(localeFileMap)
     } catch (error) {
-      console.log('')
-      console.log(chalk.bgRed(`I18nCheckKeys readBenchmarkFile error`, v))
-      console.log('')
+      console.log('');
+      console.log(chalk.bgRed(`I18nCheckKeys readBenchmarkFile error`, v));
+      console.log('');
       throw error
     }
-  })
+  });
   return localeFileMap
 }
 
 function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }) {
-  const missingPartMap = {}
+  const missingPartMap = {};
 
   // console.log('objMap', objMap)
   // console.log('fileImportVariableMap', fileImportVariableMap)
@@ -265,7 +271,7 @@ function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }) 
 
   Object.entries(localeFileMap).forEach(([_dirPath, { benchmark, other, benchmarkPath }]) => {
     other.forEach(v => {
-      const obj = getObjByPath(v)
+      const obj = getObjByPath(v);
       // currentImportVariablePathMap = {}
       // currentBenchmarkPath = benchmarkPath
       // console.log(v, fileImportVariableMap)
@@ -275,41 +281,41 @@ function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }) 
       //     currentImportVariablePathMap[variablePath.join(' > ')].push(path)
       //   })
       // }
-      const diff = diffObjKey({ benchmark, obj, path: v })
-      missingPartMap[v] = diff
-      missingPartMap[v].keyMaxLength = diff.reduce((max, [key]) => Math.max(max, key.join(' > ').length), 0)
-    })
-  })
-  let hasMissing = false
-  let missingCount = 0
+      const diff = diffObjKey({ benchmark, obj, path: v });
+      missingPartMap[v] = diff;
+      missingPartMap[v].keyMaxLength = diff.reduce((max, [key]) => Math.max(max, key.join(' > ').length), 0);
+    });
+  });
+  let hasMissing = false;
+  let missingCount = 0;
 
-  console.log('')
+  console.log('');
 
   Object.entries(missingPartMap).forEach(([filePath, diff]) => {
-    missingCount += diff.length
+    missingCount += diff.length;
     if (diff.length) {
-      hasMissing = true
-      console.log(chalk.green(`${filePath}`), chalk.yellow.bold(` Missing ${diff.length} keys `))
-      diff.forEach(v => console.log('  ', `${getAlignmentSpaceStr(v[0].join(' > '), diff.keyMaxLength)} ${benchmarkLang} value: ${v[1]}`))
+      hasMissing = true;
+      console.log(chalk.green(`${filePath}`), chalk.yellow.bold(` Missing ${diff.length} keys `));
+      diff.forEach(v => console.log('  ', `${getAlignmentSpaceStr(v[0].join(' > '), diff.keyMaxLength)} ${benchmarkLang} value: ${v[1]}`));
     }
-  })
+  });
   if (hasMissing) {
-    console.log('')
-    console.log(chalk.bgRed.bold(` ----------- ${missingCount} missing keys detected ----------- `))
-    console.log('')
-    needStopRun && process.exit()
+    console.log('');
+    console.log(chalk.bgRed.bold(` ----------- ${missingCount} missing keys detected ----------- `));
+    console.log('');
+    needStopRun && process.exit();
   } else {
-    console.log(chalk.bgGreen.bold(` ----------- No missing keys detected ----------- `))
-    console.log('')
+    console.log(chalk.bgGreen.bold(` ----------- No missing keys detected ----------- `));
+    console.log('');
   }
 }
 
 function diffObjKey({ benchmark, obj, parentKey = [], path }) {
-  const diff = []
+  const diff = [];
   Object.entries(benchmark).forEach(([key, value]) => {
-    const currentKeys = parentKey.length ? [...parentKey, key] : [key]
+    const currentKeys = parentKey.length ? [...parentKey, key] : [key];
     if (typeof value === 'object') {
-      diff.push(...diffObjKey({ benchmark: value, obj: obj[key] ?? {}, parentKey: currentKeys, path }))
+      diff.push(...diffObjKey({ benchmark: value, obj: obj[key] ?? {}, parentKey: currentKeys, path }));
     } else {
       if (obj[key] === undefined) {
         // console.log(path, currentImportVariablePathMap)
@@ -323,10 +329,10 @@ function diffObjKey({ benchmark, obj, parentKey = [], path }) {
         //   }
         // })
 
-        diff.push([currentKeys, value])
+        diff.push([currentKeys, value]);
       }
     }
-  })
+  });
   return diff
 }
 
@@ -350,16 +356,16 @@ function checkI18nKeys(options = {}) {
     languages = [],
     fileType = 'js',
     needStopRun = false,
-  } = options
+  } = options;
   return {
     run: (_path = process.cwd()) => {
-      const localePathList = getLocalePath(_path, localePath)
-      const localeFileMap = getBenchmark({ benchmarkLang, languages, fileType, localePathList })
-      diffKeys({ localeFileMap, needStopRun })
+      const localePathList = getLocalePath(_path, localePath);
+      const localeFileMap = getBenchmark({ benchmarkLang, languages, fileType, localePathList });
+      diffKeys({ localeFileMap, benchmarkLang, needStopRun });
     }
   }
 }
 
-module.exports = {
-  checkI18nKeys,
-}
+var checkI18nKeys_1 = src.checkI18nKeys = checkI18nKeys;
+
+export { checkI18nKeys_1 as checkI18nKeys, src as default };
