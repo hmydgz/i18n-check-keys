@@ -9,6 +9,10 @@ A tool to check for missing internationalization keys in a project
 # Install
 ```bash
 npm i i18n-check-keys -D
+# or
+yarn add i18n-check-keys -D
+# or
+pnpm add i18n-check-keys -D
 ```
 
 # Usage

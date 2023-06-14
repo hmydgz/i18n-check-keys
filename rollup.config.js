@@ -1,7 +1,8 @@
-import commonjs from '@rollup/plugin-commonjs';
+import commonjs from '@rollup/plugin-commonjs'
+import typescript from '@rollup/plugin-typescript'
 
 export default {
-  input: "src/index.js",
+  input: "src/index.ts",
   output: [
     {
       file: "dist/index.js",
@@ -9,10 +10,15 @@ export default {
       name: "umd"
     },
     {
+      file: "dist/index.cjs",
+      format: "cjs",
+      name: "cjs"
+    },
+    {
       file: "dist/index.esm.js",
       format: "esm",
       name: "esm"
     }
   ],
-  plugins: [commonjs()]
+  plugins: [commonjs(), typescript()]
 };

@@ -1,17 +1,22 @@
-const fs = require('fs')
-const path = require('path')
-// const generator = require('@babel/generator')
-const parser = require('@babel/parser')
-const traverse = require('@babel/traverse')
-const types = require('@babel/types')
-const chalk = require('chalk')
+import fs from 'fs'
+import path from 'path'
+import * as parser from '@babel/parser'
+import traverse from '@babel/traverse'
+import type { NodePath } from '@babel/traverse'
+import types from '@babel/types'
+import chalk from 'chalk'
 
-const fileImportVariableMap = {} // 记录导入的变量
-const objMap = {} // 记录对象
-let currentImportVariablePathMap = {} // 当前导入的变量路径
-let currentBenchmarkPath = '' // 当前基准文件路径
+type ImportVariableMap = Record<string, {
+  path: string,
+  variablePath?: string[]
+}>
 
-function completionSuffix(filePath, fileType = 'js') { // 后缀补全
+const fileImportVariableMap: Record<string, ImportVariableMap> = {} // 记录导入的变量
+const objMap: Record<string, any> = {} // 记录对象
+// let currentImportVariablePathMap = {} // 当前导入的变量路径
+// let currentBenchmarkPath = '' // 当前基准文件路径
+
+function completionSuffix(filePath: string, fileType = 'js') { // 后缀补全
   // 判断是否有后缀
   if (/\.\w+$/.test(filePath)) return filePath
   if (!filePath.endsWith(`.${fileType}`)) filePath += `.${fileType}`
@@ -21,15 +26,15 @@ function completionSuffix(filePath, fileType = 'js') { // 后缀补全
 /**
  * 获取导入文件的路径
  */
-function getImportFilePath(basePath, filePath) {
+function getImportFilePath(basePath: string, filePath: string) {
   return path.isAbsolute(filePath) // 判断是否是绝对路径
     ? filePath
     : path.join(basePath, '../', filePath) // 相对路径
 }
 
-function getImportVariableFileAst(importFilePath) {
+function getImportVariableFileAst(importFilePath: string) {
   let res
-  switch (importFilePath.match(/\.(\w+)$/)[1]) {
+  switch (importFilePath.match(/\.(\w+)$/)![1]) {
     case 'json': res = loadJsonAst(importFilePath); break
     default: res = loadJsAst(importFilePath); break
   }
@@ -40,11 +45,14 @@ function getImportVariableFileAst(importFilePath) {
 /**
  * 通过 AST Path 获取变量的路径
  */
-function getVariableAstPath(_astPath) {
-  const _path = []
-  const fn = (__astPath) => {
+function getVariableAstPath(_astPath: NodePath) {
+  const _path: string[] = []
+  const fn = (__astPath: NodePath) => {
+    // @ts-ignore
     if (__astPath.parentPath.node.type === 'Program') return
+    // @ts-ignore
     if (__astPath.node.type === 'ObjectProperty') _path.unshift(__astPath.node.key.name)
+    // @ts-ignore
     fn(__astPath.parentPath)
   }
   fn(_astPath)
@@ -60,30 +68,35 @@ function loadJsAst(filePath = '') {
     const ast = parser.parse(code, { sourceType: 'unambiguous' })
     const sourceType = ast.program.sourceType
 
-    const importVariableMap = {} // 记录导入的变量
+    const importVariableMap = {} as ImportVariableMap // 记录导入的变量
     const body = ast.program.body
-    const fileType = filePath.match(/\.(\w+)$/)[1]
+    const fileType = filePath.match(/\.(\w+)$/)![1]
 
     if (sourceType === 'module') { // ESM
       body.filter(v => v.type === 'ImportDeclaration').forEach(v => {
+        // @ts-ignore
         importVariableMap[v.specifiers[0].local.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) }
       })
     } else if (sourceType === 'script') { // CommonJS
       body.filter(v => {
-        return v.type === 'VariableDeclaration' &&
-          v.declarations[0].init.type === 'CallExpression' &&
-          v.declarations[0].init.callee.name === 'require'
+        // @ts-ignore
+        return v.type === 'VariableDeclaration' && v.declarations[0].init.type === 'CallExpression' && v.declarations[0].init.callee.name === 'require'
       }).forEach(v => {
+        // @ts-ignore
         importVariableMap[v.declarations[0].id.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) }
       })
     }
 
     fileImportVariableMap[filePath] = importVariableMap
 
-    traverse.default(ast, {
+    // 导出的对象和类型对不上，手动修正一下
+    ;((traverse as any).default as typeof traverse)(ast, {
       SpreadElement(_path) { // 处理展开运算符
+        // @ts-ignore
         if (importVariableMap[_path.node.argument.name]) {
+          // @ts-ignore
           importVariableMap[_path.node.argument.name].variablePath = getVariableAstPath(_path)
+          // @ts-ignore
           _path.replaceInline(getAstBody(getImportVariableFileAst(importVariableMap[_path.node.argument.name].path)).properties)
         }
       },
@@ -115,13 +128,15 @@ function loadJsonAst(filePath = '') {
 /**
  * AST 转对象
  */
-function astToObj(ast) {
+function astToObj(ast: types.ObjectExpression) {
   if (ast.type === 'ObjectExpression') {
     const obj = {}
     ast.properties.forEach(v => {
       if (v.type === 'ObjectProperty') {
+        // @ts-ignore
         obj[v.key.name || v.key.value] = v.value.type === 'ObjectExpression'
           ? astToObj(v.value)
+          // @ts-ignore
           : v.value.value
       }
     })
@@ -131,12 +146,13 @@ function astToObj(ast) {
 
 /**
  * 获取 AST 的 body
- * @param {parser.ParseResult<types.File>} ast 
  */
-function getAstBody(ast) {
+function getAstBody(ast: parser.ParseResult<types.File>): types.ObjectExpression {
   if (ast.program.sourceType === 'module') {
+    // @ts-ignore
     return ast.program.body.filter(v => v.type === 'ExportDefaultDeclaration')[0].declaration
   } else {
+    // @ts-ignore
     return ast.program.body.filter(v => v.type === 'ExpressionStatement')[0].right
   }
 }
@@ -144,7 +160,7 @@ function getAstBody(ast) {
 /**
  * 获取对齐空格
  */
-function getAlignmentSpaceStr(str, len = 60) {
+function getAlignmentSpaceStr(str: string, len = 60) {
   const _len = Math.max(60, len) - str.length
   return str + ' '.repeat(_len < 0 ? 5 : _len)
 }
@@ -154,9 +170,9 @@ function getAlignmentSpaceStr(str, len = 60) {
  * @param {string} _path 
  * @returns {object}
  */
-function getObjByPath(_path) {
+function getObjByPath(_path: string): object {
   try {
-    const fileType = _path.match(/\.(\w+)$/)[1].toLowerCase()
+    const fileType = _path.match(/\.(\w+)$/)![1].toLowerCase()
     let res
     switch (fileType) {
       case 'js': case 'ts':
@@ -179,12 +195,10 @@ function getObjByPath(_path) {
 
 /**
  * 获取 locale 文件夹路径
- * @param {*} _currentDirPath 
- * @param {*} _localePat 
  */
-function getLocalePath(_currentDirPath = process.cwd(), _localePath = /locale/) {
-  const localePathList = []
-  const _getLocalePath = (_path) => {
+function getLocalePath(_currentDirPath: string = process.cwd(), _localePath = /locale/) {
+  const localePathList: string[] = []
+  const _getLocalePath = (_path: string) => {
     fs.readdirSync(_path, { withFileTypes: true }).forEach((dirent) => {
       const filePath = path.join(_path, dirent.name)
       if (/node_modules|git/g.test(filePath)) return
@@ -205,10 +219,8 @@ function getLocalePath(_currentDirPath = process.cwd(), _localePath = /locale/) 
 
 /**
  * 获取后缀匹配正则表达式
- * @param {string | string[] | RegExp} fileType 
- * @returns {RegExp}
  */
-function getFileTypeRegExp(fileType) {
+function getFileTypeRegExp(fileType: string | string[] | RegExp): RegExp {
   return Array.isArray(fileType)
   ? fileType.length ? new RegExp(`\.(${fileType.join('|')})$`) : new RegExp(`\.js$`)
   : typeof fileType === 'string'
@@ -218,12 +230,26 @@ function getFileTypeRegExp(fileType) {
       : new RegExp(`\.js$`)
 }
 
+type GetBenchmarkOptions = {
+  fileType: string | string[] | RegExp,
+  languages: string[],
+  benchmarkLang: string,
+  localePathList: string[]
+}
+
+type LocaleFileMap = Record<string, {
+  benchmark?: any,
+  other: string[],
+  sameNameDirPath: string[],
+  benchmarkPath?: string
+}>
+
 /**
  * 读取基准内容
  */
-function getBenchmark({ fileType, languages, benchmarkLang, localePathList }) {
+function getBenchmark({ fileType, languages, benchmarkLang, localePathList }: GetBenchmarkOptions) {
   const _fileType = getFileTypeRegExp(fileType)
-  const localeFileMap = {}
+  const localeFileMap: LocaleFileMap = {}
   localePathList.forEach(v => {
     localeFileMap[v] = { benchmark: undefined, other: [], sameNameDirPath: [] }
     try {
@@ -256,8 +282,16 @@ function getBenchmark({ fileType, languages, benchmarkLang, localePathList }) {
   return localeFileMap
 }
 
-function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }) {
-  const missingPartMap = {}
+type DiffKeysOptions = {
+  localeFileMap: LocaleFileMap,
+  needStopRun?: boolean,
+  benchmarkLang?: string
+}
+
+type DiffDto = [string[], string][]
+
+function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }: DiffKeysOptions) {
+  const missingPartMap: Record<string, DiffDto & { keyMaxLength?: number }> = {}
 
   // console.log('objMap', objMap)
   // console.log('fileImportVariableMap', fileImportVariableMap)
@@ -304,8 +338,15 @@ function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }) 
   }
 }
 
-function diffObjKey({ benchmark, obj, parentKey = [], path }) {
-  const diff = []
+type DiffObjKeyOptions = {
+  benchmark: any,
+  obj: any,
+  parentKey?: string[],
+  path: string
+}
+
+function diffObjKey({ benchmark, obj, parentKey = [], path }: DiffObjKeyOptions) {
+  const diff: DiffDto = []
   Object.entries(benchmark).forEach(([key, value]) => {
     const currentKeys = parentKey.length ? [...parentKey, key] : [key]
     if (typeof value === 'object') {
@@ -323,27 +364,44 @@ function diffObjKey({ benchmark, obj, parentKey = [], path }) {
         //   }
         // })
 
-        diff.push([currentKeys, value])
+        diff.push([currentKeys, value as string])
       }
     }
   })
   return diff
 }
 
-/**
- * @typedef {object} I18nCheckKeysOptions
- * @property {RegExp} [localePath=/locale/] - 匹配 locale 文件夹的正则
- * @property {string} [benchmarkLang='en'] - 基准语言
- * @property {string[]} [languages=[]] - 需要检查的语言，为空时检查所有语言
- * @property {RegExp} [fileType='js'] - 匹配文件后缀
- * @property {boolean} [needStopRun=false] - 是否需要停止运行
- */
-
+type CheckI18nKeysOptions = {
+  /**
+   * 匹配 locale 文件夹的正则
+   * @default /locale/
+   */
+  localePath?: RegExp,
+  /**
+   * 基准语言
+   * @default 'en'
+   */
+  benchmarkLang?: string,
+  /**
+   * 需要检查的语言，为空时检查所有语言
+   * @default []
+   */
+  languages?: string[],
+  /**
+   * 匹配文件后缀
+   * @default 'js'
+   */
+  fileType?: string | string[] | RegExp,
+  /**
+   * 是否需要停止运行
+   * @default false
+   */
+  needStopRun?: boolean
+}
 /**
  * 检查 i18n 的 key 是否缺失
- * @param {I18nCheckKeysOptions} options 
  */
-function checkI18nKeys(options = {}) {
+export function checkI18nKeys(options: CheckI18nKeysOptions = {}) {
   const {
     localePath = /locale/,
     benchmarkLang = 'en',
@@ -359,5 +417,3 @@ function checkI18nKeys(options = {}) {
     }
   }
 }
-
-module.exports.checkI18nKeys = checkI18nKeys

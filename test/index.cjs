@@ -1,7 +1,8 @@
 const path = require('path')
 const chalk = require('chalk')
 
-const { checkI18nKeys } = require('../index')
+// const { checkI18nKeys } = require('../index')
+const { checkI18nKeys } = require('../dist/index.cjs')
 
 // console.log(chalk.blue('测试常规形式JS的检查'))
 checkI18nKeys().run(path.join(__dirname, './testData/js'))

@@ -1,8 +1,29 @@
-import fs from 'fs';
-import path from 'path';
-import * as parser from '@babel/parser';
-import traverse from '@babel/traverse';
-import chalk from 'chalk';
+'use strict';
+
+var fs = require('fs');
+var path = require('path');
+var parser = require('@babel/parser');
+var traverse = require('@babel/traverse');
+var chalk = require('chalk');
+
+function _interopNamespaceDefault(e) {
+    var n = Object.create(null);
+    if (e) {
+        Object.keys(e).forEach(function (k) {
+            if (k !== 'default') {
+                var d = Object.getOwnPropertyDescriptor(e, k);
+                Object.defineProperty(n, k, d.get ? d : {
+                    enumerable: true,
+                    get: function () { return e[k]; }
+                });
+            }
+        });
+    }
+    n.default = e;
+    return Object.freeze(n);
+}
+
+var parser__namespace = /*#__PURE__*/_interopNamespaceDefault(parser);
 
 const fileImportVariableMap = {}; // 记录导入的变量
 const objMap = {}; // 记录对象
@@ -61,7 +82,7 @@ function getVariableAstPath(_astPath) {
 function loadJsAst(filePath = '') {
     try {
         let code = fs.readFileSync(filePath).toString();
-        const ast = parser.parse(code, { sourceType: 'unambiguous' });
+        const ast = parser__namespace.parse(code, { sourceType: 'unambiguous' });
         const sourceType = ast.program.sourceType;
         const importVariableMap = {}; // 记录导入的变量
         const body = ast.program.body;
@@ -113,7 +134,7 @@ function loadJsAst(filePath = '') {
  */
 function loadJsonAst(filePath = '') {
     const code = fs.readFileSync(filePath).toString();
-    return parser.parse(`export default ${code}`, { sourceType: 'unambiguous' });
+    return parser__namespace.parse(`export default ${code}`, { sourceType: 'unambiguous' });
 }
 /**
  * AST 转对象
@@ -339,4 +360,4 @@ function checkI18nKeys(options = {}) {
     };
 }
 
-export { checkI18nKeys };
+exports.checkI18nKeys = checkI18nKeys;
