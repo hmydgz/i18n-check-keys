@@ -13,26 +13,26 @@ jobs:
         uses: actions/checkout@v3
       
 
-      - name: Read previous version number
-        id: read-version
-        run: echo "::set-output name=version::$(cat .version)"
+      # - name: Read previous version number
+      #   id: read-version
+      #   run: echo "::set-output name=version::$(cat .version)"
 
-      - name: Read current version number
-        id: read-current-version
-        uses: actions/github-script@v4
-        with:
-          script: |
-            const fs = require('fs');
-            const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
-            console.log(packageJson.version);
+      # - name: Read current version number
+      #   id: read-current-version
+      #   uses: actions/github-script@v4
+      #   with:
+      #     script: |
+      #       const fs = require('fs');
+      #       const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+      #       console.log(packageJson.version);
 
-      - name: Compare versions
-        run: |
-          if [ "${{ steps.read-version.outputs.version }}" != "${{ steps.read-current-version.outputs.result }}" ]; then
-            echo "Version changed!";
-          else
-            echo "Version not changed!";
-          fi
+      # - name: Compare versions
+      #   run: |
+      #     if [ "${{ steps.read-version.outputs.version }}" != "${{ steps.read-current-version.outputs.result }}" ]; then
+      #       echo "Version changed!";
+      #     else
+      #       echo "Version not changed!";
+      #     fi
 
 
       # - name: 安装 Node.js
