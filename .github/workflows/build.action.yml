@@ -50,9 +50,12 @@ jobs:
       - name: 构建
         run: pnpm run build
 
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: 测试
+        run: cd dist && ls
+      
+      # - run: npm publish --tag alpha
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # publish-npm:
   #   needs: build
