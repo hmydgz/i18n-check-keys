@@ -2,6 +2,8 @@
 
 [English](./README.md) | 简体中文
 
+[![npm](https://img.shields.io/npm/v/i18n-check-keys.svg)](https://github.com/heimeiyaodagongzai/i18n-check-keys) [![build status](https://github.com/heimeiyaodagongzai/i18n-check-keys/actions/workflows/build.action.yml/badge.svg?branch=main)](https://github.com/heimeiyaodagongzai/i18n-check-keys/actions)
+
 用于检查项目中的国际化 key 是否存在遗漏的工具
 
 ![](http://qiniuyun.hmydgz.top/doc/img/i18n-check-keys-img1.png)

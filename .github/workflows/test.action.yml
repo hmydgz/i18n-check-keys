@@ -1,81 +1,81 @@
-name: test
+# name: test
 
-on:
-  push:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+#       - main
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
       
 
-      # - name: Read previous version number
-      #   id: read-version
-      #   run: echo "::set-output name=version::$(cat .version)"
+#       # - name: Read previous version number
+#       #   id: read-version
+#       #   run: echo "::set-output name=version::$(cat .version)"
 
-      # - name: Read current version number
-      #   id: read-current-version
-      #   uses: actions/github-script@v4
-      #   with:
-      #     script: |
-      #       const fs = require('fs');
-      #       const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
-      #       console.log(packageJson.version);
+#       # - name: Read current version number
+#       #   id: read-current-version
+#       #   uses: actions/github-script@v4
+#       #   with:
+#       #     script: |
+#       #       const fs = require('fs');
+#       #       const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+#       #       console.log(packageJson.version);
 
-      # - name: Compare versions
-      #   run: |
-      #     if [ "${{ steps.read-version.outputs.version }}" != "${{ steps.read-current-version.outputs.result }}" ]; then
-      #       echo "Version changed!";
-      #     else
-      #       echo "Version not changed!";
-      #     fi
+#       # - name: Compare versions
+#       #   run: |
+#       #     if [ "${{ steps.read-version.outputs.version }}" != "${{ steps.read-current-version.outputs.result }}" ]; then
+#       #       echo "Version changed!";
+#       #     else
+#       #       echo "Version not changed!";
+#       #     fi
 
 
-      # - name: 安装 Node.js
-      #   uses: actions/setup-node@v3
-      #   with:
-      #     node-version: 16
-      #     registry-url: https://registry.npmjs.org/
+#       # - name: 安装 Node.js
+#       #   uses: actions/setup-node@v3
+#       #   with:
+#       #     node-version: 16
+#       #     registry-url: https://registry.npmjs.org/
 
-      # - name: 安装 pnpm
-      #   uses: pnpm/action-setup@v2
-      #   id: pnpm-install
-      #   with:
-      #     version: 8
-      #     run_install: false
+#       # - name: 安装 pnpm
+#       #   uses: pnpm/action-setup@v2
+#       #   id: pnpm-install
+#       #   with:
+#       #     version: 8
+#       #     run_install: false
 
-      # - name: 获取 pnpm 缓存路径
-      #   id: pnpm-cache
-      #   shell: bash
-      #   run: |
-      #     echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+#       # - name: 获取 pnpm 缓存路径
+#       #   id: pnpm-cache
+#       #   shell: bash
+#       #   run: |
+#       #     echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
-      # - name: 设置 pnpm 缓存
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-      #     key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-pnpm-store-
+#       # - name: 设置 pnpm 缓存
+#       #   uses: actions/cache@v3
+#       #   with:
+#       #     path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+#       #     key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+#       #     restore-keys: |
+#       #       ${{ runner.os }}-pnpm-store-
 
       
 
-      # - name: 安装 rollup
-      #   run: pnpm i -g rollup
+#       # - name: 安装 rollup
+#       #   run: pnpm i -g rollup
 
-      # - name: 安装 TS
-      #   run: pnpm i -g typescript
+#       # - name: 安装 TS
+#       #   run: pnpm i -g typescript
 
-      # - name: 安装依赖
-      #   run: pnpm i
+#       # - name: 安装依赖
+#       #   run: pnpm i
 
-      # - name: 构建
-      #   run: pnpm build
+#       # - name: 构建
+#       #   run: pnpm build
       
-      # - run: npm publish
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+#       # - run: npm publish
+#       #   env:
+#       #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
