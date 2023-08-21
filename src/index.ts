@@ -371,7 +371,7 @@ function diffObjKey({ benchmark, obj, parentKey = [], path }: DiffObjKeyOptions)
   return diff
 }
 
-type CheckI18nKeysOptions = {
+export type CheckI18nKeysOptions = {
   /**
    * 匹配 locale 文件夹的正则
    * @default /locale/
