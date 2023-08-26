@@ -1,10 +1,11 @@
-import fs from 'fs'
+import fs, { Dirent } from 'fs'
 import path from 'path'
 import * as parser from '@babel/parser'
 import traverse from '@babel/traverse'
 import type { NodePath } from '@babel/traverse'
 import types from '@babel/types'
 import chalk from 'chalk'
+import { LanCodeSet } from './config'
 
 type ImportVariableMap = Record<string, {
   path: string,
@@ -16,23 +17,42 @@ const objMap: Record<string, any> = {} // 记录对象
 // let currentImportVariablePathMap = {} // 当前导入的变量路径
 // let currentBenchmarkPath = '' // 当前基准文件路径
 
-function completionSuffix(filePath: string, fileType = 'js') { // 后缀补全
-  // 判断是否有后缀
-  if (/\.\w+$/.test(filePath)) return filePath
-  if (!filePath.endsWith(`.${fileType}`)) filePath += `.${fileType}`
-  return filePath
+function getFileExtensionName(_path: string) {
+  return _path.match(/\.(\w+)$/)![1]
 }
 
 /**
  * 获取导入文件的路径
  */
 function getImportFilePath(basePath: string, filePath: string) {
-  return path.isAbsolute(filePath) // 判断是否是绝对路径
-    ? filePath
-    : path.join(basePath, '../', filePath) // 相对路径
+  if (path.isAbsolute(filePath)) return filePath
+  try { // TODO 尝试找不带后缀的文件和index文件
+    const _path = path.join(basePath, '../', filePath)
+    if (fs.existsSync(_path)) { // 路径存在
+      const stats = fs.statSync(_path)
+      if (stats.isDirectory()) { // 是目录, 尝试找index文件
+        const indexFile = getIndexFile(_path)
+        return indexFile ? path.join(_path, indexFile.name) : ''
+      } else if (stats.isFile()) {
+        return _path
+      }
+    } else { // 路径不存在，尝试加后缀找
+      const _filePath = `${_path}.${getFileExtensionName(basePath)}`
+      if (fs.existsSync(_filePath)) {
+        if (fs.statSync(_filePath).isFile()) {
+          return _filePath
+        }
+      }
+    }
+    return ''
+  } catch (error) {
+    return ''
+  }
 }
 
 function getImportVariableFileAst(importFilePath: string) {
+  // 无效路径, 返回空对象
+  if (!importFilePath) return parser.parse(`export default {}`, { sourceType: 'unambiguous' })
   let res
   switch (importFilePath.match(/\.(\w+)$/)![1]) {
     case 'json': res = loadJsonAst(importFilePath); break
@@ -47,7 +67,7 @@ function getImportVariableFileAst(importFilePath: string) {
  */
 function getVariableAstPath(_astPath: NodePath) {
   const _path: string[] = []
-  const fn = (__astPath: NodePath) => {
+  const fn = (__astPath: NodePath) => { // 递归获取变量路径，从最内层开始，直到 Program
     // @ts-ignore
     if (__astPath.parentPath.node.type === 'Program') return
     // @ts-ignore
@@ -70,12 +90,12 @@ function loadJsAst(filePath = '') {
 
     const importVariableMap = {} as ImportVariableMap // 记录导入的变量
     const body = ast.program.body
-    const fileType = filePath.match(/\.(\w+)$/)![1]
 
     if (sourceType === 'module') { // ESM
       body.filter(v => v.type === 'ImportDeclaration').forEach(v => {
+        // TODO 准备 0.1.12 做收集非默认导出的变量
         // @ts-ignore
-        importVariableMap[v.specifiers[0].local.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) }
+        importVariableMap[v.specifiers[0].local.name] = { path: getImportFilePath(filePath, v.source.value) }
       })
     } else if (sourceType === 'script') { // CommonJS
       body.filter(v => {
@@ -83,7 +103,7 @@ function loadJsAst(filePath = '') {
         return v.type === 'VariableDeclaration' && v.declarations[0].init.type === 'CallExpression' && v.declarations[0].init.callee.name === 'require'
       }).forEach(v => {
         // @ts-ignore
-        importVariableMap[v.declarations[0].id.name] = { path: getImportFilePath(filePath, completionSuffix(v.source.value, fileType)) }
+        importVariableMap[v.declarations[0].id.name] = { path: getImportFilePath(filePath, v.source.value) }
       })
     }
 
@@ -167,7 +187,7 @@ function getAlignmentSpaceStr(str: string, len = 60) {
 
 /**
  * 根据文件路径获取对象
- * @param {string} _path 
+ * @param {string} _path
  * @returns {object}
  */
 function getObjByPath(_path: string): object {
@@ -179,7 +199,7 @@ function getObjByPath(_path: string): object {
         res = astToObj(getAstBody(loadJsAst(_path)))
         break
       case 'json':
-        res = JSON.parse(fs.readFileSync(_path).toString() ?? '{}')
+        res = JSON.parse(fs.readFileSync(_path, { encoding: 'utf-8' }).toString() ?? '{}')
         break
     }
     objMap[_path] = res
@@ -194,7 +214,7 @@ function getObjByPath(_path: string): object {
 }
 
 /**
- * 获取 locale 文件夹路径
+ * 获取 locale 目录路径
  */
 function getLocalePath(_currentDirPath: string = process.cwd(), _localePath = /locale/) {
   const localePathList: string[] = []
@@ -222,27 +242,68 @@ function getLocalePath(_currentDirPath: string = process.cwd(), _localePath = /l
  */
 function getFileTypeRegExp(fileType: string | string[] | RegExp): RegExp {
   return Array.isArray(fileType)
-  ? fileType.length ? new RegExp(`\.(${fileType.join('|')})$`) : new RegExp(`\.js$`)
-  : typeof fileType === 'string'
-    ? new RegExp(`\.(${fileType})$`)
-    : fileType instanceof RegExp
-      ? fileType
-      : new RegExp(`\.js$`)
+    ? fileType.length ? new RegExp(`\.(${fileType.join('|')})$`) : new RegExp(`\.js$`)
+    : typeof fileType === 'string'
+      ? new RegExp(`\.(${fileType})$`)
+      : fileType instanceof RegExp
+        ? fileType
+        : new RegExp(`\.js$`)
 }
 
 type GetBenchmarkOptions = {
+  /**
+   * 文件类型
+   */
   fileType: string | string[] | RegExp,
+  /**
+   * 需要检查的语言
+   */
   languages: string[],
+  /**
+   * 基准语言
+   */
   benchmarkLang: string,
+  /**
+   * locale 目录路径列表
+   */
   localePathList: string[]
 }
 
 type LocaleFileMap = Record<string, {
+  /**
+   * 用于对比的基准对象
+   */
   benchmark?: any,
+  /**
+   * 基准对象外的需要用来对比的文件路径
+   */
   other: string[],
+  /**
+   * 同名目录路径
+   */
   sameNameDirPath: string[],
+  /**
+   * 基准文件路径
+   */
   benchmarkPath?: string
 }>
+
+/**
+ * 获取 index 文件
+ */
+function getIndexFile(_path: string) {
+  return fs.readdirSync(_path, { withFileTypes: true }).find(v => v.isFile() && v.name.split('.')[0] === 'index')
+}
+
+/**
+ * 查找 index 文件
+ */
+function findIndexFilePath(_path: string, callback: (_path: string) => any) {
+  const indexFile = getIndexFile(_path)
+  if (indexFile) {
+    callback(path.join(_path, indexFile.name))
+  }
+}
 
 /**
  * 读取基准内容
@@ -250,18 +311,47 @@ type LocaleFileMap = Record<string, {
 function getBenchmark({ fileType, languages, benchmarkLang, localePathList }: GetBenchmarkOptions) {
   const _fileType = getFileTypeRegExp(fileType)
   const localeFileMap: LocaleFileMap = {}
+
+  // 设置基准文件
+  const setBenchmark = (localePath: string, benchmarkPath: string) => {
+    localeFileMap[localePath].benchmark = getObjByPath(benchmarkPath)
+    localeFileMap[localePath].benchmarkPath = benchmarkPath
+  }
+  // 记录文件路径
+  const recordPath = (localePath: string, filePath: string, dirent: Dirent) => {
+    if (!_fileType.test(filePath)) return
+    // 匹配要检查的语言
+    if (languages.length && !languages.some(v => dirent.name.includes(v))) return
+    if (!dirent.name.includes(benchmarkLang)) {
+      localeFileMap[localePath].other.push(filePath)
+    } else {
+      setBenchmark(localePath, filePath)
+    }
+  }
+
   localePathList.forEach(v => {
     localeFileMap[v] = { benchmark: undefined, other: [], sameNameDirPath: [] }
     try {
+      // 遍历目录，获取基准文件
       fs.readdirSync(v, { withFileTypes: true }).forEach((dirent) => {
-        // 匹配文件后缀
-        if (dirent.isDirectory()) return
+        // 匹配路径名，是语言编码的继续
+        if (LanCodeSet.has(dirent.name.replace(/[^a-zA-Z]/g, '').toLowerCase())) {
+          // 是目录的尝试找index文件
+          if (dirent.isDirectory()) {
+            // 尝试找index文件
+            findIndexFilePath(path.join(v, dirent.name), (_path) => recordPath(v, _path, dirent))
+          // 文件的话，判断是否是基准文件
+          } else if (dirent.isFile()) {
+            recordPath(v, path.join(v, dirent.name), dirent)
+          }
+          return
+        }
+
         if (!_fileType.test(dirent.name) && dirent.name) return
         const filePath = path.join(v, dirent.name)
 
-        if (dirent.name.includes(benchmarkLang)) {
-          localeFileMap[v].benchmark = getObjByPath(filePath)
-          localeFileMap[v].benchmarkPath = filePath
+        if (dirent.name.includes(benchmarkLang) && !localeFileMap[v].benchmark) {
+          setBenchmark(v, filePath)
         } else {
           // 匹配要检查的语言
           if (languages.length && !languages.some(v => dirent.name.includes(v))) return
@@ -373,7 +463,7 @@ function diffObjKey({ benchmark, obj, parentKey = [], path }: DiffObjKeyOptions)
 
 export type CheckI18nKeysOptions = {
   /**
-   * 匹配 locale 文件夹的正则
+   * 匹配 locale 目录的正则
    * @default /locale/
    */
   localePath?: RegExp,
@@ -406,7 +496,7 @@ export function checkI18nKeys(options: CheckI18nKeysOptions = {}) {
     localePath = /locale/,
     benchmarkLang = 'en',
     languages = [],
-    fileType = 'js',
+    fileType = ['js', 'ts', 'json'],
     needStopRun = false,
   } = options
   return {

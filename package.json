@@ -1,6 +1,6 @@
 {
   "name": "i18n-check-keys",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "A tool to check for missing internationalization keys in a project",
   "files": [
     "dist"
@@ -21,7 +21,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/heimeiyaodagongzai/i18n-check-keys"
+    "url": "https://github.com/hmydgz/i18n-check-keys"
   },
   "keywords": [
     "i18n",
@@ -31,6 +31,7 @@
   "author": "",
   "scripts": {
     "test": "node test/index.esm.mjs",
+    "bt": "tsc --declaration && rollup -c && node test/index.esm.mjs",
     "testCjs": "node test/index.cjs",
     "build": "tsc --declaration && rollup -c"
   },

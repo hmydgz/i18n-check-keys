@@ -2,7 +2,9 @@
 
 English | [简体中文](./README.zh_CN.md)
 
-[![npm](https://img.shields.io/npm/v/i18n-check-keys.svg)](https://github.com/heimeiyaodagongzai/i18n-check-keys) [![build status](https://github.com/heimeiyaodagongzai/i18n-check-keys/actions/workflows/build.action.yml/badge.svg?branch=main)](https://github.com/heimeiyaodagongzai/i18n-check-keys/actions)
+[![npm](https://img.shields.io/npm/v/i18n-check-keys.svg)](https://github.com/hmydgz/i18n-check-keys)
+[![npm](https://img.shields.io/npm/dt/i18n-check-keys.svg)](https://github.com/hmydgz/i18n-check-keys)
+[![build status](https://github.com/hmydgz/i18n-check-keys/actions/workflows/build.action.yml/badge.svg?branch=main)](https://github.com/hmydgz/i18n-check-keys/actions)
 
 
 A tool to check for missing internationalization keys in a project
