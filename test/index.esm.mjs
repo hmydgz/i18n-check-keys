@@ -9,7 +9,10 @@ const __dirname = path.dirname(__filename)
 
 console.time('checkI18nKeys')
 
-// checkI18nKeys().run(path.join(__dirname, './testData/jsDir2'))
-checkI18nKeys({ localePath: /i18n/ }).run(`D:\\dev\\project\\test\\nginxconfig.io`)
+checkI18nKeys().run(path.join(__dirname, './testData/js'))
+checkI18nKeys().run(path.join(__dirname, './testData/json'))
+checkI18nKeys().run(path.join(__dirname, './testData/jsDir'))
+checkI18nKeys().run(path.join(__dirname, './testData/jsDir2'))
+// checkI18nKeys({ localePath: /i18n/ }).run(`D:\\dev\\project\\test\\nginxconfig.io`)
 
 console.timeEnd('checkI18nKeys')

@@ -2,20 +2,17 @@ import fs, { Dirent } from 'fs'
 import path from 'path'
 import * as parser from '@babel/parser'
 import traverse from '@babel/traverse'
-import type { NodePath } from '@babel/traverse'
 import types from '@babel/types'
 import chalk from 'chalk'
 import { LanCodeSet } from './config'
 
 type ImportVariableMap = Record<string, {
   path: string,
-  variablePath?: string[]
+  isDefault: boolean
 }>
 
 const fileImportVariableMap: Record<string, ImportVariableMap> = {} // 记录导入的变量
 const objMap: Record<string, any> = {} // 记录对象
-// let currentImportVariablePathMap = {} // 当前导入的变量路径
-// let currentBenchmarkPath = '' // 当前基准文件路径
 
 function getFileExtensionName(_path: string) {
   return _path.match(/\.(\w+)$/)![1]
@@ -62,22 +59,6 @@ function getImportVariableFileAst(importFilePath: string) {
   return res
 }
 
-/**
- * 通过 AST Path 获取变量的路径
- */
-function getVariableAstPath(_astPath: NodePath) {
-  const _path: string[] = []
-  const fn = (__astPath: NodePath) => { // 递归获取变量路径，从最内层开始，直到 Program
-    // @ts-ignore
-    if (__astPath.parentPath.node.type === 'Program') return
-    // @ts-ignore
-    if (__astPath.node.type === 'ObjectProperty') _path.unshift(__astPath.node.key.name)
-    // @ts-ignore
-    fn(__astPath.parentPath)
-  }
-  fn(_astPath)
-  return _path
-}
 
 /**
  * 加载 JS 文件的 AST
@@ -89,13 +70,30 @@ function loadJsAst(filePath = '') {
     const sourceType = ast.program.sourceType
 
     const importVariableMap = {} as ImportVariableMap // 记录导入的变量
+    const variableMap = {} as Record<string, any> // 记录变量名和变量值原始 AstNodePath
     const body = ast.program.body
-
+    // 收集顶层导入的变量
     if (sourceType === 'module') { // ESM
-      body.filter(v => v.type === 'ImportDeclaration').forEach(v => {
-        // TODO 准备 0.1.12 做收集非默认导出的变量
-        // @ts-ignore
-        importVariableMap[v.specifiers[0].local.name] = { path: getImportFilePath(filePath, v.source.value) }
+      body.filter(v => ['ImportDeclaration', 'VariableDeclaration', 'ExportNamedDeclaration'].includes(v.type)).forEach(v => {
+        switch (v.type) {
+          case 'ImportDeclaration':
+            v.specifiers.forEach(_v => {
+              // @ts-ignore
+              importVariableMap[_v.imported ? _v.imported.name : _v.local.name] = {
+                isDefault: _v.type === 'ImportDefaultSpecifier',
+                path: getImportFilePath(filePath, v.source.value)
+              }
+            })
+            break
+          case 'VariableDeclaration': // 暂时只支持 const a = 1 这种正常形式的定义
+            // @ts-ignore
+            variableMap[v.declarations[0].id.name] = v.declarations[0].init
+            break
+          case 'ExportNamedDeclaration':
+            // @ts-ignore
+            variableMap[v.declaration.declarations[0].id.name] = v.declaration.declarations[0].init
+            break
+        }
       })
     } else if (sourceType === 'script') { // CommonJS
       body.filter(v => {
@@ -113,18 +111,29 @@ function loadJsAst(filePath = '') {
     ;((traverse as any).default as typeof traverse)(ast, {
       SpreadElement(_path) { // 处理展开运算符
         // @ts-ignore
-        if (importVariableMap[_path.node.argument.name]) {
-          // @ts-ignore
-          importVariableMap[_path.node.argument.name].variablePath = getVariableAstPath(_path)
-          // @ts-ignore
-          _path.replaceInline(getAstBody(getImportVariableFileAst(importVariableMap[_path.node.argument.name].path)).properties)
+        const name = _path.node?.argument?.name
+        if (!name) return
+        if (importVariableMap[name]) {
+          _path.replaceInline(getAstBody(getImportVariableFileAst(importVariableMap[name].path)).properties)
+        } else if (variableMap[name]) {
+          _path.replaceInline(variableMap[name])
         }
       },
       ObjectProperty(_path) { // 处理变量类型的值
-        if (_path.node.value.type === 'Identifier' && importVariableMap[_path.node.value.name]) {
-          importVariableMap[_path.node.value.name].variablePath = getVariableAstPath(_path)
-          _path.node.value = getAstBody(getImportVariableFileAst(importVariableMap[_path.node.value.name].path))
+        // @ts-ignore
+        const name = _path.node?.argument?.name
+        if (!name) return
+        if (_path.node.value.type === 'Identifier' && (importVariableMap[name] || variableMap[name])) {
+          if (importVariableMap[name]) {
+            _path.node.value = getAstBody(getImportVariableFileAst(importVariableMap[name].path))
+          } else { // 替换变量值节点
+            _path.replaceWith(variableMap[name])
+          }
         }
+      },
+      TemplateLiteral(_path) { // 处理模板字符串，表达式的可能性太多了，处理不完，先用占位
+        const str = _path.node.quasis.map((v => v.value.cooked)).join('${ expressions }')
+        _path.replaceWith(types.stringLiteral(str))
       }
     })
 
@@ -142,7 +151,7 @@ function loadJsAst(filePath = '') {
  */
 function loadJsonAst(filePath = '') {
   const code = fs.readFileSync(filePath).toString()
-  return parser.parse(`export default ${code}`, { sourceType: 'unambiguous' })
+  return parser.parse(`export default ${code}`, { sourceType: 'module' })
 }
 
 /**
@@ -300,9 +309,7 @@ function getIndexFile(_path: string) {
  */
 function findIndexFilePath(_path: string, callback: (_path: string) => any) {
   const indexFile = getIndexFile(_path)
-  if (indexFile) {
-    callback(path.join(_path, indexFile.name))
-  }
+  if (indexFile) callback(path.join(_path, indexFile.name))
 }
 
 /**
@@ -358,8 +365,6 @@ function getBenchmark({ fileType, languages, benchmarkLang, localePathList }: Ge
           localeFileMap[v].other.push(filePath)
         }
 
-        // const sameNameDirPath = path.join(v, dirent.name.split('.')[0])
-        // fs.existsSync(sameNameDirPath) && localeFileMap[v].sameNameDirPath.push(dirent.name.split('.')[0])
       })
       // console.log(localeFileMap)
     } catch (error) {
@@ -373,9 +378,10 @@ function getBenchmark({ fileType, languages, benchmarkLang, localePathList }: Ge
 }
 
 type DiffKeysOptions = {
-  localeFileMap: LocaleFileMap,
-  needStopRun?: boolean,
+  localeFileMap: LocaleFileMap
+  needStopRun?: boolean
   benchmarkLang?: string
+  onlyWarnLanguages?: string[]
 }
 
 type DiffDto = [string[], string][]
@@ -383,22 +389,9 @@ type DiffDto = [string[], string][]
 function diffKeys({ localeFileMap, needStopRun = false, benchmarkLang = 'en' }: DiffKeysOptions) {
   const missingPartMap: Record<string, DiffDto & { keyMaxLength?: number }> = {}
 
-  // console.log('objMap', objMap)
-  // console.log('fileImportVariableMap', fileImportVariableMap)
-  // console.log('localeFileMap', localeFileMap)
-
   Object.entries(localeFileMap).forEach(([_dirPath, { benchmark, other, benchmarkPath }]) => {
     other.forEach(v => {
       const obj = getObjByPath(v)
-      // currentImportVariablePathMap = {}
-      // currentBenchmarkPath = benchmarkPath
-      // console.log(v, fileImportVariableMap)
-      // if (Object.keys(fileImportVariableMap[v]).length) { // 存在变量
-      //   Object.entries(fileImportVariableMap[v]).forEach(([variableName, { variablePath, path }]) => {
-      //     if (!currentImportVariablePathMap[variablePath.join(' > ')]) currentImportVariablePathMap[variablePath.join(' > ')] = []
-      //     currentImportVariablePathMap[variablePath.join(' > ')].push(path)
-      //   })
-      // }
       const diff = diffObjKey({ benchmark, obj, path: v })
       missingPartMap[v] = diff
       missingPartMap[v].keyMaxLength = diff.reduce((max, [key]) => Math.max(max, key.join(' > ').length), 0)
@@ -443,17 +436,6 @@ function diffObjKey({ benchmark, obj, parentKey = [], path }: DiffObjKeyOptions)
       diff.push(...diffObjKey({ benchmark: value, obj: obj[key] ?? {}, parentKey: currentKeys, path }))
     } else {
       if (obj[key] === undefined) {
-        // console.log(path, currentImportVariablePathMap)
-        // Object.keys(currentImportVariablePathMap).forEach(v => {
-        //   if (v) { // 不是顶层展开的，能查
-        //     if (currentKeys.join(' > ').startsWith(v)) { // 变量前缀
-        //       console.log(path, objMap[currentImportVariablePathMap[v]]);
-        //     }
-        //   } else { // 顶层展开的，不好查来源
-
-        //   }
-        // })
-
         diff.push([currentKeys, value as string])
       }
     }
@@ -487,6 +469,10 @@ export type CheckI18nKeysOptions = {
    * @default false
    */
   needStopRun?: boolean
+  /**
+   * 仅警告的语言列表（比如还没上线的语言）
+   */
+  onlyWarnLanguages?: string[]
 }
 /**
  * 检查 i18n 的 key 是否缺失
@@ -498,12 +484,13 @@ export function checkI18nKeys(options: CheckI18nKeysOptions = {}) {
     languages = [],
     fileType = ['js', 'ts', 'json'],
     needStopRun = false,
+    onlyWarnLanguages = []
   } = options
   return {
     run: (_path = process.cwd()) => {
       const localePathList = getLocalePath(_path, localePath)
       const localeFileMap = getBenchmark({ benchmarkLang, languages, fileType, localePathList })
-      diffKeys({ localeFileMap, benchmarkLang, needStopRun })
+      diffKeys({ localeFileMap, benchmarkLang, needStopRun, onlyWarnLanguages })
     }
   }
 }

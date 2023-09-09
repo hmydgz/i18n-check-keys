@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      
+
       - name: 安装 Node.js
         uses: actions/setup-node@v3
         with:
@@ -52,7 +52,7 @@ jobs:
 
       - name: 构建
         run: pnpm build
-      
+
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

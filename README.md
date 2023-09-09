@@ -2,14 +2,41 @@
 
 English | [简体中文](./README.zh_CN.md)
 
-[![npm](https://img.shields.io/npm/v/i18n-check-keys.svg)](https://github.com/hmydgz/i18n-check-keys)
-[![npm](https://img.shields.io/npm/dt/i18n-check-keys.svg)](https://github.com/hmydgz/i18n-check-keys)
-[![build status](https://github.com/hmydgz/i18n-check-keys/actions/workflows/build.action.yml/badge.svg?branch=main)](https://github.com/hmydgz/i18n-check-keys/actions)
-
+[![npm](https://img.shields.io/npm/v/i18n-check-keys.svg)](https://github.com/hmydgz/i18n-check-keys) [![npm](https://img.shields.io/npm/dt/i18n-check-keys.svg)](https://github.com/hmydgz/i18n-check-keys) [![build status](https://github.com/hmydgz/i18n-check-keys/actions/workflows/build.action.yml/badge.svg?branch=main)](https://github.com/hmydgz/i18n-check-keys/actions)
 
 A tool to check for missing internationalization keys in a project
 
+webpack plugin: [i18n-check-keys-webpack-plugin](https://github.com/hmydgz/i18n-check-keys-webpack-plugin)
+vite plugin: [vite-plugin-i18n-check-keys](https://github.com/hmydgz/vite-plugin-i18n-check-keys)
+
 ![](http://qiniuyun.hmydgz.top/doc/img/i18n-check-keys-img1.png)
+
+Automatically checks for supported path forms
+
+```
+│ locales
+│  ├─en
+│  │  └ index.js
+│  └─zh_CN
+│     └ index.js
+```
+
+```
+│ locales
+│  ├─en.js
+│  └─zh_CN.js
+```
+
+```
+├─dir1
+│  └─locale
+|    ├─en.js
+|    └─zh_CN.js
+├─dir2
+│  └─locale
+|    ├─en.js
+|    └─zh_CN.js
+```
 
 # Install
 ```bash
