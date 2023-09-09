@@ -1,6 +1,6 @@
 {
   "name": "i18n-check-keys",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "A tool to check for missing internationalization keys in a project",
   "files": [
     "dist"
